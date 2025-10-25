@@ -5,3 +5,5 @@ terraform/tfstates/
 terraform/.terraform/
 terraform/.terraform.lock.hcl
 terraform/terraform-plugin-proxmox.log
+variables/dev/
+variables/pro/

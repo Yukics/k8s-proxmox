@@ -1,0 +1,5 @@
+proxmox:
+  storage_name: zfs
+  net_bridge: vmbr0
+  net_adapter: virtio
+  template: ubuntu-24
