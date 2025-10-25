@@ -2,3 +2,6 @@
 .env.dev
 packer/**/downloaded_iso_path/
 terraform/tfstates/
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform-plugin-proxmox.log
