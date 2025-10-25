@@ -1,0 +1,4 @@
+.env.pro
+.env.dev
+packer/**/downloaded_iso_path/
+terraform/tfstates/
