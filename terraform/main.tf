@@ -1,0 +1,234 @@
+resource "proxmox_vm_qemu" "k8s-infrastructure" {
+  for_each = { for inst in concat(local.k8s.node.controlplane, local.k8s.node.worker) : inst.name => inst }
+
+  name        = each.value.name
+  target_node = each.value.hypervisor
+  description = "k8s ${local.k8s.cluster}"
+  tags        = "k8s,${local.k8s.cluster}"
+  onboot      = false
+  boot        = "order=scsi0;net0"
+  agent       = 1
+  qemu_os     = "l26"
+
+  clone = local.proxmox.template
+
+  memory = each.value.ram
+
+  cpu {
+    cores   = each.value.cpu
+    sockets = 1
+  }
+
+  network {
+    id     = 0
+    model  = local.proxmox.net_adapter
+    bridge = local.proxmox.net_bridge
+  }
+
+  disk {
+    slot    = "scsi0"
+    type    = "disk"
+    storage = local.proxmox.storage_name
+    size    = "${each.value.disk[0]}G"
+    backup  = false
+  }
+
+  disk {
+    slot    = "scsi1"
+    type    = "disk"
+    storage = local.proxmox.storage_name
+    size    = "${each.value.disk[1]}G"
+    backup  = false
+  }
+
+  disk {
+    slot    = "scsi2"
+    type    = "disk"
+    storage = local.proxmox.storage_name
+    size    = "${each.value.disk[2]}G"
+    backup  = false
+  }
+
+  # cloud-init configuration
+  os_type      = "cloud-init"
+  ciupgrade    = true
+  ipconfig0    = "ip=${each.value.ip}/${local.k8s.net.cidr},gw=${local.k8s.net.gw}"
+  searchdomain = local.k8s.net.searchdomain
+  nameserver   = join(" ", local.k8s.net.dns)
+  skip_ipv6    = false
+
+  disk {
+    slot    = "ide1"
+    type    = "cloudinit"
+    storage = local.proxmox.storage_name
+  }
+
+}
+
+# # Modify path for templatefile and use the recommended extension of .tftpl for syntax hylighting in code editors.
+# resource "local_file" "cloud_init_user_data_file" {
+#   count    = var.vm_count
+#   content  = templatefile("${var.working_directory}/cloud-inits/cloud-init.cloud_config.tftpl", { ssh_key = var.ssh_public_key, hostname = var.name })
+#   filename = "${path.module}/files/user_data_${count.index}.cfg"
+# }
+
+# resource "null_resource" "cloud_init_config_files" {
+#   count = var.vm_count
+#   connection {
+#     type     = "ssh"
+#     user     = "${var.pve_user}"
+#     password = "${var.pve_password}"
+#     host     = "${var.pve_host}"
+#   }
+
+#   provisioner "file" {
+#     source      = local_file.cloud_init_user_data_file[count.index].filename
+#     destination = "/var/lib/vz/snippets/user_data_vm-${count.index}.yml"
+#   }
+# }
+
+# /* Configure Cloud-Init User-Data with custom config file */
+# resource "proxmox_vm_qemu" "cloudinit-test" {
+#   depends_on = [
+#     null_resource.cloud_init_config_files,
+#   ]
+
+#   name        = "tftest1.xyz.com"
+#   description = "tf description"
+#   target_node = "proxmox1-xx"
+
+#   clone = "ci-ubuntu-template"
+
+#   # The destination resource pool for the new VM
+#   pool = "pool0"
+
+#   storage = "local"
+#   cores   = 3
+#   sockets = 1
+#   memory  = 2560
+#   disk_gb = 4
+#   nic     = "virtio"
+#   bridge  = "vmbr0"
+
+#   ssh_user        = "root"
+#   ssh_private_key = <<EOF
+# -----BEGIN RSA PRIVATE KEY-----
+# private ssh key root
+# -----END RSA PRIVATE KEY-----
+# EOF
+
+#   os_type   = "cloud-init"
+#   ipconfig0 = "ip=10.0.2.99/16,gw=10.0.2.2"
+
+#   /*
+#     sshkeys and other User-Data parameters are specified with a custom config file.
+#     In this example each VM has its own config file, previously generated and uploaded to
+#     the snippets folder in the local storage in the Proxmox VE server.
+#   */
+#   cicustom                = "user=local:snippets/user_data_vm-${count.index}.yml"
+#   /* Create the Cloud-Init drive on the "local-lvm" storage */
+#   disks {
+#     ide {
+#       ide3 {
+#         cloudinit {
+#           storage = "local-lvm"
+#         }
+#       }
+#     }
+#   }
+
+#   provisioner "remote-exec" {
+#     inline = [
+#       "ip a"
+#     ]
+#   }
+# }
+
+# /* Uses custom eth1 user-net SSH portforward */
+# resource "proxmox_vm_qemu" "preprovision-test" {
+#   name        = "tftest1.xyz.com"
+#   description = "tf description"
+#   target_node = "proxmox1-xx"
+
+#   clone = "terraform-ubuntu1404-template"
+
+#   # The destination resource pool for the new VM
+#   pool = "pool0"
+
+#   cores    = 3
+#   sockets  = 1
+#   # Same CPU as the Physical host, possible to add cpu flags
+#   # Ex: "host,flags=+md-clear;+pcid;+spec-ctrl;+ssbd;+pdpe1gb"
+#   cpu_type = "host"
+#   numa     = false
+#   memory   = 2560
+#   scsihw   = "lsi"
+#   # Boot from hard disk (c), CD-ROM (d), network (n)
+#   boot     = "cdn"
+#   # It's possible to add this type of material and use it directly
+#   # Possible values are: network,disk,cpu,memory,usb
+#   hotplug  = "network,disk,usb"
+#   # Default boot disk
+#   bootdisk = "virtio0"
+#   # HA, you need to use a shared disk for this feature (ex: rbd)
+#   hastate  = ""
+
+#   #Display
+#   vga {
+#     type   = "std"
+#     #Between 4 and 512, ignored if type is defined to serial
+#     memory = 4
+#   }
+
+#   network {
+#     id    = 0
+#     model = "virtio"
+#   }
+#   network {
+#     id     = 1
+#     model  = "virtio"
+#     bridge = "vmbr1"
+#   }
+#   disk {
+#     id           = 0
+#     type         = "virtio"
+#     storage      = "local-lvm"
+#     storage_type = "lvm"
+#     size         = "4G"
+#     backup       = true
+#   }
+#   # Serial interface of type socket is used by xterm.js
+#   # You will need to configure your guest system before being able to use it
+#   serial {
+#     id   = 0
+#     type = "socket"
+#   }
+#   preprovision    = true
+#   ssh_forward_ip  = "10.0.0.1"
+#   ssh_user        = "terraform"
+#   ssh_private_key = <<EOF
+# -----BEGIN RSA PRIVATE KEY-----
+# private ssh key terraform
+# -----END RSA PRIVATE KEY-----
+# EOF
+
+#   os_type           = "ubuntu"
+#   os_network_config = <<EOF
+# auto eth0
+# iface eth0 inet dhcp
+# EOF
+
+#   connection {
+#     type        = "ssh"
+#     user        = self.ssh_user
+#     private_key = self.ssh_private_key
+#     host        = self.ssh_host
+#     port        = self.ssh_port
+#   }
+
+#   provisioner "remote-exec" {
+#     inline = [
+#       "ip a"
+#     ]
+#   }
+# }
