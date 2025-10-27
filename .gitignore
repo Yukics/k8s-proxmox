@@ -7,3 +7,5 @@ terraform/.terraform.lock.hcl
 terraform/terraform-plugin-proxmox.log
 variables/dev/
 variables/pro/
+ansible/.venv/
+ansible/roles/geerlingguy.docker/

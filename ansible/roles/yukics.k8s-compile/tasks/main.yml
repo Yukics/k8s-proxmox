@@ -1,0 +1,2 @@
+- name: Include build tasks
+  ansible.builtin.include_tasks: build.yml

@@ -56,6 +56,10 @@ terraform plan
 terraform apply
 ```
 
+## Ansible
+
+WARN! This implementation is heavily opinionated. 
+
 # Technical debt
 
 1. Boot disk size must be the same on packer and terraform resource (by now 20G).

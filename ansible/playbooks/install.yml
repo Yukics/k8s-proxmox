@@ -1,0 +1,12 @@
+- name: Build Kubernetes from source
+  hosts: mypc
+  tasks:
+    - name: Include the example role
+      include_role:
+        name: yukics.k8s-compile
+      vars:
+        k8s_version: 'v1.34.1'
+        k8s_build_path: "/tmp/build"
+      tags: 
+        - k8s
+        - compile

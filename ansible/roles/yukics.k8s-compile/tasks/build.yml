@@ -1,0 +1,23 @@
+- name: Download Kubernetes source code
+  ansible.builtin.git:
+    repo: 'https://github.com/kubernetes/kubernetes.git'
+    dest: "{{ k8s_build_path }}/kubernetes"
+    version: "{{ k8s_version }}"
+
+- name: Refresh group membership to include me docker group
+  ansible.builtin.shell: |
+    newgrp docker <<EONG
+    id
+    EONG
+  args:
+    chdir: "{{ k8s_build_path }}/kubernetes"
+    executable: /bin/bash
+
+- name: Build Kubernetes from source code
+  community.general.make:
+    chdir: "{{ k8s_build_path }}/kubernetes"
+    # target: release
+  retries: 3
+  delay: 3
+  register: result
+  until: result.command == "success"
