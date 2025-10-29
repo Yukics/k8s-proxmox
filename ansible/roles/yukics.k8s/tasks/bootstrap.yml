@@ -1,0 +1,18 @@
+- name: Add IP address of all hosts to all hosts
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item].ansible_ssh_host }} {{ (item | split('.'))[0] }} {{ item }}"
+    state: present
+  when: 
+    - hostvars[item].ansible_ssh_host is defined
+    - inventory_hostname != item
+  with_items: "{{ groups.all }}"
+
+- ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/k8s.conf
+  loop:
+    - { name: net.ipv4.ip_forward, value: '1' } # https://kubernetes.io/docs/setup/production-environment/container-runtimes/#prerequisite-ipv4-forwarding-optional

@@ -4,7 +4,7 @@ autoinstall:
   identity:
     hostname: ubuntu-packer
     username: ubuntu
-    password: "$6$canonical.$0zWaW71A9ke9ASsaOcFTdQ2tx1gSmLxMPrsH0rF0Yb.2AEKNPV1lrF94n6YuPJmnUy2K2/JSDtxuiBDey6Lpa/" # ubuntu
+    password: "$y$j9T$48o5RbFqX/DrNKJ2P0o.A.$z6iaQuLjSl71PmYEs84nMgGEUlzLXADzKR2zPhBt0UA" # ubuntu
   keyboard:
     layout: es
   ssh:

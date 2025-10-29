@@ -1,0 +1,3 @@
+- name: Include controlplane bootsrap tasks
+  ansible.builtin.include_tasks: bootstrap.yml
+  when: k8s_action == 'bootstrap_controlplane'

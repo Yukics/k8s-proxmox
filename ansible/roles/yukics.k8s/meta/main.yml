@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: "k8s"
+  # namespace: yukics
+  author: yukics
+  description: An Ansible role to setup and manage Kubernetes vanilla clusters on Proxmox VMs.
+  license: GPL-3.0-only
+  min_ansible_version: "2.1"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags: []
+
+dependencies: []

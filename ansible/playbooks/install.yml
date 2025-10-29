@@ -1,7 +1,7 @@
 - name: Build Kubernetes from source
   hosts: mypc
   tasks:
-    - name: Include the example role
+    - name: Compile k8s
       include_role:
         name: yukics.k8s-compile
       vars:
@@ -10,3 +10,53 @@
       tags: 
         - k8s
         - compile
+        - never # by now
+
+- name: Kubernetes dynamic inventory from files
+  hosts: all
+  vars:
+    env: "{{ lookup('ansible.builtin.env', 'ENV', default=undef()) }}"
+  tasks:
+    - include_vars: "../../variables/{{ env }}/k8s.yml"
+    - include_vars: "../../variables/{{ env }}/proxmox.yml"
+    
+    - name: Create k8s_controlplanes group
+      ansible.builtin.add_host:
+        hostname: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+        ansible_ssh_host: "{{ item.ip }}"
+        ansible_user: "ubuntu"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+        ansible_ssh_private_key_file: "{{ ssh_priv_key_file }}"
+        groups: 
+          - k8s_controlplanes
+          - k8s_nodes
+      loop: "{{ k8s['node']['controlplane'] }}"
+
+    - name: Create k8s_workers group
+      ansible.builtin.add_host:
+        hostname: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+        ansible_ssh_host: "{{ item.ip }}"
+        ansible_user: "ubuntu"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+        ansible_ssh_private_key_file: "{{ ssh_priv_key_file }}"
+        groups: 
+          - k8s_workers
+          - k8s_nodes
+      loop: "{{ k8s['node']['worker'] }}"
+
+- name: Bootstrap Kubernetes control plane
+  hosts: k8s_controlplanes
+  vars:
+    env: "{{ lookup('ansible.builtin.env', 'ENV', default=undef()) }}"
+  tasks:
+    - include_vars: "../../variables/{{ env }}/k8s.yml"
+
+    - include_vars: "../../variables/{{ env }}/proxmox.yml"
+
+    - include_role:
+        name: yukics.k8s
+      vars:
+        k8s_action: 'bootstrap_controlplane'
+        k8s_version: "{{ k8s['version'] }}"
+        k8s_pod_network_cidr: "{ k8s['pod_network_cidr'] }}"
+        k8s_svc_network_cidr: "{ k8s['svc_network_cidr'] }}"

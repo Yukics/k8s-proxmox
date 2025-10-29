@@ -1,10 +1,10 @@
 resource "proxmox_vm_qemu" "k8s-infrastructure" {
   for_each = { for inst in concat(local.k8s.node.controlplane, local.k8s.node.worker) : inst.name => inst }
 
-  name        = each.value.name
+  name        = "${each.value.name}.${local.k8s.cluster}.${local.k8s.net.searchdomain}"
   target_node = each.value.hypervisor
   description = "k8s ${local.k8s.cluster}"
-  tags        = "k8s,${local.k8s.cluster}"
+  tags        = "k8s,${local.k8s.cluster},${anytrue([for v in local.k8s.node.controlplane : contains([each.value.name], v.name)]) ? "controlplane" : "worker"}" # dynamic tags based on node role
   onboot      = false
   boot        = "order=scsi0;net0"
   agent       = 1

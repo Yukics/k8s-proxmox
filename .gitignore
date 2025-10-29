@@ -9,3 +9,4 @@ variables/dev/
 variables/pro/
 ansible/.venv/
 ansible/roles/geerlingguy.docker/
+ansible/plugins/callback/__pycache__/
