@@ -1,0 +1,32 @@
+[ req ]
+default_bits = {{ certs_bits | default('2048') }}
+prompt = no
+default_md = sha256
+req_extensions = req_ext
+distinguished_name = dn
+
+[ dn ]
+C = {{ certs_country | default('ES') }}
+ST = {{ certs_state | default('Madrid') }}
+L = {{ certs_city | default('Madrid') }}
+O = {{ certs_org | default('YukiCS') }}
+OU = {{ certs_org_unit | default('IT') }}
+CN = {{ certs_cn | default('kubernetes') }}
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+{% for dns in cert_alt_names.dns %}
+DNS.{{ loop.index }} = {{ dns }}
+{% endfor %}
+{% for ip in cert_alt_names.ip %}
+IP.{{ loop.index }} = {{ ip }}
+{% endfor %}
+
+[ v3_ext ]
+authorityKeyIdentifier=keyid,issuer:always
+basicConstraints=CA:FALSE
+keyUsage=keyEncipherment,dataEncipherment
+extendedKeyUsage=serverAuth,clientAuth
+subjectAltName=@alt_names

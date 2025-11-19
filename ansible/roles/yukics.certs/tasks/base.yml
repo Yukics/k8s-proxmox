@@ -1,0 +1,13 @@
+- name: Install dependencies
+  ansible.builtin.apt:
+    name:
+      - openssl
+    state: present
+    update_cache: true
+
+- name: Create directory for certs
+  ansible.builtin.file:
+    path: "{{ certs_path }}"
+    recurse: true
+    state: directory
+    mode: '0777'

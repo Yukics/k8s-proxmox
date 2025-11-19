@@ -1,0 +1,11 @@
+- name: Install dependencies
+  ansible.builtin.include_tasks: base.yml
+  when: not certs_dependencies_solved | default(false)
+
+- name: Include CA tasks
+  ansible.builtin.include_tasks: ca.yml
+  when: certs_action == 'ca'
+
+- name: Include server certificate tasks
+  ansible.builtin.include_tasks: nodes.yml
+  when: certs_action == 'nodes'

@@ -1,0 +1,19 @@
+- name: Check if CA certificate already exists
+  ansible.builtin.stat:
+    path: "{{ certs_path }}/ca.crt"
+  register: ca_cert_stat
+
+- name: Generate CA certificate and key
+  ansible.builtin.shell: |
+    openssl req -nodes -new -x509 -batch \
+    -passout pass:{{ certs_pass }} \
+    -passin pass:"{{ certs_pass }}" \
+    -newkey {{ certs_type }} \
+    -keyout {{ certs_path }}/ca.key \
+    -out {{ certs_path }}/ca.crt \
+    -days {{ certs_expiracy_days }} \
+    -subj "/CN={{ certs_cn }}"
+  # args:
+  #   creates: "{{ certs_path }}/ca.crt"
+  when:
+    - ca_cert_stat.stat.exists == false or certs_overwrite | default(false)
