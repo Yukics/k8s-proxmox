@@ -1,0 +1,3 @@
+{
+    "ansible.python.interpreterPath": "~/repos/k8s-proxmox/ansible/.venv/bin/python"
+}
