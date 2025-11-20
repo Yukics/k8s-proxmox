@@ -1,108 +1,123 @@
 ---
 argument_specs:
-  # roles/myapp/tasks/main.yml entry point
   main:
     short_description: Main entry point for the certificate role
     description:
-      - This is the main entrypoint for the C(myapp) role.
-      - Here we can describe what this entrypoint does in lengthy words.
-      - Every new list item is a new paragraph. You can have multiple sentences
-        per paragraph.
+      - This role manages the creation of CA and node certificates using OpenSSL.
     author:
       - YukiCS
-    options: {}
-      # k8s_version:
-      #   type: "str"
-      #   # required: true
-      #   description: "K8s version to compile from source code"
+    options:
+      certs_action:
+        type: "str"
+        required: true
+        description: "What action to perform in the certificates role create a CA or node certificates"
 
-      # k8s_build_path:
-      #   type: "str"
-      #   # required: true
-      #   description: "Path to download repo and build Kubernetes source code"
+      certs_path: 
+        type: "str"
+        required: true
+        description: "Where to store the created certificates"
+      
+      certs_expiracy_days:
+        type: "int"
+        required: false
+        default: 3650
+        description: "Time in days before the created certificate expires"
 
-      # myapp_int:
-      #   type: "int"
-      #   required: false
-      #   default: 42
-      #   description:
-      #     - "The integer value, defaulting to 42."
-      #     - "This is a second paragraph."
-      # myapp_str:
-      #   type: "str"
-      #   required: true
-      #   description: "The string value"
+      certs_cn:
+        type: "str"
+        required: true
+        description: "Common Name (CN) for the certificate"
 
-      # myapp_list:
-      #   type: "list"
-      #   elements: "str"
-      #   required: true
-      #   description: "A list of string values."
-      #   version_added: 1.3.0
+      certs_overwrite: 
+        type: "bool"
+        required: true
+        description: "Whether to overwrite existing certificates"
 
-      # myapp_list_with_dicts:
-      #   type: "list"
-      #   elements: "dict"
-      #   required: false
-      #   default:
-      #     - myapp_food_kind: "meat"
-      #       myapp_food_boiling_required: true
-      #       myapp_food_preparation_time: 60
-      #     - myapp_food_kind: "fruits"
-      #       myapp_food_preparation_time: 5
-      #   description: "A list of dicts with a defined structure and with default a value."
-      #   options:
-      #     myapp_food_kind:
-      #       type: "str"
-      #       choices:
-      #         - "vegetables"
-      #         - "fruits"
-      #         - "grains"
-      #         - "meat"
-      #       required: false
-      #       description: "A string value with a limited list of allowed choices."
+      certs_dependencies_solved: 
+        type: "bool"
+        required: false
+        description: "Whether to skip dependency checks and openssl installation"
 
-      #     myapp_food_boiling_required:
-      #       type: "bool"
-      #       required: false
-      #       default: false
-      #       description: "Whether the kind of food requires boiling before consumption."
+      certs_pass:
+        type: "str"
+        required: false
+        default: ''
+        description: "Password for the certificate, if any"
 
-      #     myapp_food_preparation_time:
-      #       type: int
-      #       required: true
-      #       description: "Time to prepare a dish in minutes."
+      certs_type:
+        type: "str"
+        required: false
+        default: 'rsa:4096'
+        description: "Type of certificate to create, e.g., rsa:4096"
+      
+      certs_country: 
+        type: "str"
+        required: false
+        default: ''
+        description: "Country for the certificate"
 
-      # myapp_dict_with_suboptions:
-      #   type: "dict"
-      #   required: false
-      #   default:
-      #     myapp_host: "bar.foo"
-      #     myapp_exclude_host: true
-      #     myapp_path: "/etc/myapp"
-      #   description: "A dict with a defined structure and default values."
-      #   options:
-      #     myapp_host:
-      #       type: "str"
-      #       choices:
-      #         - "foo.bar"
-      #         - "bar.foo"
-      #         - "ansible.foo.bar"
-      #       required: true
-      #       description: "A string value with a limited list of allowed choices."
+      certs_state: 
+        type: "str"
+        required: false
+        default: ''
+        description: "State for the certificate"
+      
+      certs_city: 
+        type: "str"
+        required: false
+        default: ''
+        description: "City for the certificate"
 
-      #     myapp_exclude_host:
-      #       type: "bool"
-      #       required: true
-      #       description: "A boolean value."
+      certs_org: 
+        type: "str"
+        required: false
+        default: ''
+        description: "Organization for the certificate"
 
-      #     myapp_path:
-      #       type: "path"
-      #       required: true
-      #       description: "A path value."
+      certs_org_unit:
+        type: "str"
+        required: false
+        default: ''
+        description: "Organization Unit for the certificate"
 
-      #     original_name:
-      #       type: list
-      #       elements: "str"
-      #       required: false
-      #       description: "An optional list of string values."
+      certs_ca_crt:
+        type: "str"
+        required: false
+        description: "Path to the CA certificate to sign the node certificate"
+      
+      certs_ca_key:
+        type: "str"
+        required: false
+        description: "Path to the CA key to sign the node certificate"
+      
+      cert_name:
+        type: "str"
+        required: false
+        description: "Name of the certificate to create"
+      
+      certs_csr_template:
+        type: "str"
+        required: false
+        description: "Jinja2 template for the CSR configuration"
+      
+      certs_bits:
+        type: "int"
+        required: false
+        default: 4096
+        description: "Number of bits for the certificate key"
+
+      cert_alt_names:
+        type: "dict"
+        required: false
+        description: "Alternative names and IP for the certificate "
+        options:
+          dns:
+            type: "list"
+            elements: "str"
+            required: false
+            description: "List of DNS names for the certificate"
+          ip:
+            type: "list"
+            elements: "str"
+            required: false
+            description: "List of IP addresses for the certificate"

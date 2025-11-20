@@ -1,45 +1,65 @@
-- name: Create certificates key
-  ansible.builtin.shell: |
-    openssl genrsa -out {{ certs_path }}/{{ cert_name | default('server') }}.key {{ certs_bits | default('2048') }}
-  args:
-    creates: "{{ certs_path }}/{{ cert_name | default('server') }}.key"
+- name: Create directory for certs
+  become: false
+  ansible.builtin.file:
+    path: "{{ certs_path }}"
+    state: directory
+    mode: '0777'
 
-- name: Create certificate signing request (CSR) configuration file
-  ansible.builtin.template:
-    src: "templates/{{ certs_csr_template | default('kube-csr.conf.j2') }}"
-    dest: "{{ certs_path }}/{{ cert_name | default('server') }}-csr.conf"
-    owner: root
-    group: root
-    mode: '0644'
+- name: Check if certificate already exists
+  become: false
+  ansible.builtin.stat:
+    path: "{{ certs_path }}/{{ cert_name | default('server') }}.crt"
+  register: cert_stat
 
-- name: Create certificate signing request (CSR)
-  ansible.builtin.shell: |
-    openssl req -new -key {{ certs_path }}/{{ cert_name | default('server') }}.key \
-    -out {{ certs_path }}/{{ cert_name | default('server') }}.csr \
-    -config {{ certs_path }}/{{ cert_name | default('server') }}-csr.conf
-  args:
-    creates: "{{ certs_path }}/{{ cert_name | default('server') }}.csr"
-
-- name: Sign certificate with CA kube-csr
-  ansible.builtin.shell: |
-    openssl x509 -req -in {{ certs_path }}/{{ cert_name | default('server') }}.csr \
-    -CA {{ certs_ca_crt }} -CAkey {{ certs_ca_key }} -CAcreateserial \
-    -out {{ certs_path }}/{{ cert_name | default('server') }}.crt \
-    -days {{ certs_expiracy_days | default(365) }} \
-    -extensions v3_ext -extfile {{ certs_path }}/{{ cert_name | default('server') }}-csr.conf -sha256
-  args:
-    creates: "{{ certs_path }}/{{ cert_name | default('server') }}.crt"
+- name: Generate certificate and key if not exists or overwrite is true
   when:
-    - certs_csr_template == 'kube-csr.conf.j2'
+    - not cert_stat.stat.exists or certs_overwrite | default(false)
+  block:
+    - name: Create certificates key
+      become: false
+      ansible.builtin.shell: |
+        openssl genrsa -out {{ certs_path }}/{{ cert_name | default('server') }}.key {{ certs_bits | default('2048') }}
+      args:
+        creates: "{{ certs_path }}/{{ cert_name | default('server') }}.key"
 
-- name: Sign certificate with CA
-  ansible.builtin.shell: |
-    openssl x509 -req -in {{ certs_path }}/{{ cert_name | default('server') }}.csr \
-    -CA {{ certs_ca_crt }} -CAkey {{ certs_ca_key }} -CAcreateserial \
-    -out {{ certs_path }}/{{ cert_name | default('server') }}.crt \
-    -days {{ certs_expiracy_days | default(365) }} \
-    -extfile {{ certs_path }}/{{ cert_name | default('server') }}-csr.conf
-  args:
-    creates: "{{ certs_path }}/{{ cert_name | default('server') }}.crt"
-  when:
-    - certs_csr_template != 'kube-csr.conf.j2'
+    - name: Create certificate signing request (CSR) configuration file
+      become: false
+      ansible.builtin.template:
+        src: "templates/{{ certs_csr_template | default('kube-csr.conf.j2') }}"
+        dest: "{{ certs_path }}/{{ cert_name | default('server') }}-csr.conf"
+        mode: '0644'
+
+    - name: Create certificate signing request (CSR)
+      become: false
+      ansible.builtin.shell: |
+        openssl req -new -key {{ certs_path }}/{{ cert_name | default('server') }}.key \
+        -out {{ certs_path }}/{{ cert_name | default('server') }}.csr \
+        -config {{ certs_path }}/{{ cert_name | default('server') }}-csr.conf
+      args:
+        creates: "{{ certs_path }}/{{ cert_name | default('server') }}.csr"
+
+    - name: Sign certificate with CA kube-csr
+      become: false
+      ansible.builtin.shell: |
+        openssl x509 -req -in {{ certs_path }}/{{ cert_name | default('server') }}.csr \
+        -CA {{ certs_ca_crt }} -CAkey {{ certs_ca_key }} -CAcreateserial \
+        -out {{ certs_path }}/{{ cert_name | default('server') }}.crt \
+        -days {{ certs_expiracy_days | default(365) }} \
+        -extensions v3_ext -extfile {{ certs_path }}/{{ cert_name | default('server') }}-csr.conf -sha256
+      args:
+        creates: "{{ certs_path }}/{{ cert_name | default('server') }}.crt"
+      when:
+        - certs_csr_template == 'kube-csr.conf.j2'
+
+    - name: Sign certificate with CA
+      become: false
+      ansible.builtin.shell: |
+        openssl x509 -req -in {{ certs_path }}/{{ cert_name | default('server') }}.csr \
+        -CA {{ certs_ca_crt }} -CAkey {{ certs_ca_key }} -CAcreateserial \
+        -out {{ certs_path }}/{{ cert_name | default('server') }}.crt \
+        -days {{ certs_expiracy_days | default(365) }} \
+        -extfile {{ certs_path }}/{{ cert_name | default('server') }}-csr.conf
+      args:
+        creates: "{{ certs_path }}/{{ cert_name | default('server') }}.crt"
+      when:
+        - certs_csr_template != 'kube-csr.conf.j2'

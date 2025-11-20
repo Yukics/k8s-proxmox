@@ -1,33 +1,38 @@
 - name: Build Kubernetes from source
-  hosts: mypc
+  hosts: local
   tasks:
     - name: Compile k8s
-      include_role:
+      ansible.builtin.include_role:
         name: yukics.k8s-compile
       vars:
         k8s_version: 'v1.34.1'
         k8s_build_path: "/tmp/build"
-      tags: 
-        - k8s
-        - compile
-        - never # by now
+  tags:
+    - k8s
+    - compile
+    - never # by now
 
 - name: Kubernetes dynamic inventory from files
   hosts: all
+  gather_facts: false
   vars:
     env: "{{ lookup('ansible.builtin.env', 'ENV', default=undef()) }}"
   tasks:
-    - include_vars: "../../variables/{{ env }}/k8s.yml"
-    - include_vars: "../../variables/{{ env }}/proxmox.yml"
-    
+    - name: Load k8s variables
+      ansible.builtin.include_vars: "../../variables/{{ env }}/k8s.yml"
+    - name: Load proxmox variables
+      ansible.builtin.include_vars: "../../variables/{{ env }}/proxmox.yml"
+
     - name: Create k8s_controlplanes group
       ansible.builtin.add_host:
         hostname: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
         ansible_ssh_host: "{{ item.ip }}"
         ansible_user: "ubuntu"
+        ansible_become: true
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
         ansible_ssh_private_key_file: "{{ ssh_priv_key_file }}"
-        groups: 
+        ansible_python_interpreter: /usr/bin/python3
+        groups:
           - k8s_controlplanes
           - k8s_nodes
       loop: "{{ k8s['node']['controlplane'] }}"
@@ -37,26 +42,176 @@
         hostname: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
         ansible_ssh_host: "{{ item.ip }}"
         ansible_user: "ubuntu"
+        ansible_become: true
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
         ansible_ssh_private_key_file: "{{ ssh_priv_key_file }}"
-        groups: 
+        ansible_python_interpreter: /usr/bin/python3
+        groups:
           - k8s_workers
           - k8s_nodes
       loop: "{{ k8s['node']['worker'] }}"
+  tags:
+    - k8s
+    - inventory
+    - always
 
-- name: Bootstrap Kubernetes control plane
-  hosts: k8s_controlplanes
+- name: Setup certificates for Kubernetes nodes
+  hosts: local
   vars:
     env: "{{ lookup('ansible.builtin.env', 'ENV', default=undef()) }}"
   tasks:
-    - include_vars: "../../variables/{{ env }}/k8s.yml"
+    - name: Load k8s variables
+      ansible.builtin.include_vars: "../../variables/{{ env }}/k8s.yml"
+    - name: Load proxmox variables
+      ansible.builtin.include_vars: "../../variables/{{ env }}/proxmox.yml"
 
-    - include_vars: "../../variables/{{ env }}/proxmox.yml"
+    - name: Create CA certificates
+      ansible.builtin.include_role:
+        name: yukics.certs
+      vars:
+        certs_action: 'ca'
+        certs_path: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca"
+        certs_expiracy_days: 3650
+        certs_cn: "*.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+        certs_overwrite: false
+        certs_pass: ''
+        certs_type: 'rsa:4096'
 
-    - include_role:
+    - name: Create kubelet certificates
+      ansible.builtin.include_role:
+        name: yukics.certs
+      vars:
+        certs_dependencies_solved: true
+        certs_action: 'nodes'
+        certs_ca_crt: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.crt"
+        certs_ca_key: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.key"
+        certs_path: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/{{ item.name }}"
+        cert_name: "kubelet"
+        certs_csr_template: "kube-csr.conf.j2"
+        certs_expiracy_days: 3650
+        certs_cn: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+        certs_country: "ES"
+        certs_state: "Madrid"
+        certs_city: "Madrid"
+        certs_org: "YukiCS"
+        certs_org_unit: "kubelet"
+        certs_overwrite: false
+        certs_pass: ''
+        certs_bits: '4096'
+        cert_alt_names:
+          dns:
+            - "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+            - "{{ item.name }}"
+            - "kubernetes"
+            - "kubernetes.default"
+            - "kubernetes.default.svc"
+            - "kubernetes.default.svc.cluster"
+            - "kubernetes.default.svc.cluster.local"
+          ip:
+            - "{{ k8s['net']['controlplane_vip'] }}"
+            - "{{ item.ip }}"
+      loop: "{{ k8s['node']['controlplane'] + k8s['node']['worker'] }}"
+
+    - name: Create kube-api certificates
+      ansible.builtin.include_role:
+        name: yukics.certs
+      vars:
+        certs_dependencies_solved: true
+        certs_action: 'nodes'
+        certs_ca_crt: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.crt"
+        certs_ca_key: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.key"
+        certs_path: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/{{ item.name }}"
+        cert_name: "k8s-api"
+        certs_csr_template: "kube-csr.conf.j2"
+        certs_expiracy_days: 3650
+        certs_cn: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+        certs_country: "ES"
+        certs_state: "Madrid"
+        certs_city: "Madrid"
+        certs_org: "YukiCS"
+        certs_org_unit: "kube-api"
+        certs_overwrite: false
+        certs_pass: ''
+        certs_bits: '4096'
+        cert_alt_names:
+          dns:
+            - "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+            - "{{ item.name }}"
+            - "kubernetes"
+            - "kubernetes.default"
+            - "kubernetes.default.svc"
+            - "kubernetes.default.svc.cluster"
+            - "kubernetes.default.svc.cluster.local"
+          ip:
+            - "{{ k8s['net']['controlplane_vip'] }}"
+            - "{{ item.ip }}"
+      loop: "{{ k8s['node']['controlplane'] }}"
+
+    - name: Create etcd certificates
+      ansible.builtin.include_role:
+        name: yukics.certs
+      vars:
+        certs_dependencies_solved: true
+        certs_action: 'nodes'
+        certs_ca_crt: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.crt"
+        certs_ca_key: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.key"
+        certs_path: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/{{ item.name }}"
+        cert_name: "etcd"
+        certs_csr_template: "kube-csr.conf.j2"
+        certs_expiracy_days: 3650
+        certs_cn: "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+        certs_country: "ES"
+        certs_state: "Madrid"
+        certs_city: "Madrid"
+        certs_org: "YukiCS"
+        certs_org_unit: "etcd"
+        certs_overwrite: false
+        certs_pass: ''
+        certs_bits: '4096'
+        cert_alt_names:
+          dns:
+            - "{{ item.name }}.{{ k8s['cluster'] }}.{{ k8s['net']['searchdomain'] }}"
+            - "{{ item.name }}"
+          ip:
+            - "{{ item.ip }}"
+      loop: "{{ k8s['node']['controlplane'] }}"
+  tags:
+    - k8s
+    - certificates
+    - always
+
+- name: Bootstrap Kubernetes control plane
+  hosts: k8s_controlplanes:k8s_workers
+  vars:
+    env: "{{ lookup('ansible.builtin.env', 'ENV', default=undef()) }}"
+  tasks:
+    - name: Load k8s variables
+      ansible.builtin.include_vars: "../../variables/{{ env }}/k8s.yml"
+    - name: Load proxmox variables
+      ansible.builtin.include_vars: "../../variables/{{ env }}/proxmox.yml"
+
+    - name: Setup base for all nodes
+      ansible.builtin.include_role:
         name: yukics.k8s
       vars:
-        k8s_action: 'bootstrap_controlplane'
+        k8s_action: 'base'
         k8s_version: "{{ k8s['version'] }}"
-        k8s_pod_network_cidr: "{ k8s['pod_network_cidr'] }}"
-        k8s_svc_network_cidr: "{ k8s['svc_network_cidr'] }}"
+        k8s_certificates_ca_path_crt: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/ca/ca.crt"
+        k8s_certificates_node_path_crt: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/{{ inventory_hostname.split('.')[0] }}/kubelet.crt"
+        k8s_certificates_node_path_key: "../../certificates/{{ env }}/{{ k8s['cluster'] }}/{{ inventory_hostname.split('.')[0] }}/kubelet.key"
+        k8s_certificates_path: '/etc/kubernetes/pki'
+        k8s_certificates_pass: ''
+        k8s_net_pod: "{{ k8s['net']['pod'] }}"
+        k8s_net_address: "{{ ansible_ssh_host }}"
+        k8s_cluster: "{{ k8s['cluster'] }}"
+        k8s_net_searchdomain: "{{ k8s['net']['searchdomain'] }}"
+
+    # - name: Bootstrap control plane nodes
+    #   ansible.builtin.include_role:
+    #     name: yukics.k8s
+    #   vars:
+    #     k8s_action: 'bootstrap_controlplane'
+    #     k8s_version: "{{ k8s['version'] }}"
+    #     k8s_pod_network_cidr: "{ k8s['net']['pod'] }}"
+    #     k8s_svc_network_cidr: "{ k8s['net']['svc'] }}"
+    #   when: '"k8s_controlplanes" in group_names'
